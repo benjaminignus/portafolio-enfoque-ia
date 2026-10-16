@@ -32,8 +32,8 @@ file:///storage/emulated/0/Download/portafolio-movil.html
 
 ## Versión en PDF (`Portafolio ENFOQUE IA.pdf`)
 
-Una portada con el índice y una ficha por tarjeta (fotos, usuario y botón «Ver demo en vídeo»). El botón es un enlace
-**relativo** al vídeo, así que los `.mp4` deben estar en la **misma carpeta que el PDF** con estos nombres fijos:
+Una portada con el índice y una ficha por tarjeta (fotos, usuario, botón «Ver demo · N min» y, si hay app publicada, «Ver app»).
+«Ver demo» es un enlace **relativo** al vídeo, así que los `.mp4` deben estar en la **misma carpeta que el PDF** con estos nombres fijos:
 `taller.mp4`, `clinicas.mp4`, `obra-clara.mp4`, `circulos.mp4`, `asesorias.mp4`, `whatsapp.mp4`.
 
 - Un PDF no puede abrir un selector de archivos: por eso el vídeo se elige por nombre fijo. Los que no existen
@@ -77,6 +77,7 @@ Para activar una demo nueva: deja su `.mp4` con el nombre fijo junto al PDF y vu
 
 ## Comportamiento
 
-- Cada tarjeta comprueba al cargar si su `.mp4` está junto a la página y muestra «Vídeo listo · 4 min 45 s». Si falta, lo dice (y si abres la página como `content://`, explica cómo abrirla bien).
-- «▶ Ver demo» abre el vídeo a pantalla completa con controles. La ✕ o el gesto «atrás» del móvil vuelven al menú.
+- Cada tarjeta comprueba al cargar si su `.mp4` está junto a la página y, si está, el botón pasa a «🎞 Ver demo · N min» (minutos redondeados). Si falta, el botón dice «Falta el vídeo» y un aviso explica por qué (y si abres la página como `content://`, cómo abrirla bien).
+- «Ver demo» abre el vídeo a pantalla completa con controles. La ✕ o el gesto «atrás» del móvil vuelven al menú.
+- «Ver app» (Taller, Clínicas y Obra Clara) abre la aplicación publicada en una pestaña nueva; las URL están en `APP_URL` de `generar_portafolio.py`.
 - Se conservan las imágenes del carrusel y el modo noche del menú de escritorio.
