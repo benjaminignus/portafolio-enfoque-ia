@@ -80,4 +80,10 @@ Para activar una demo nueva: deja su `.mp4` con el nombre fijo junto al PDF y vu
 - Cada tarjeta comprueba al cargar si su `.mp4` está junto a la página y, si está, el botón pasa a «🎞 Ver demo · N min» (minutos redondeados). Si falta, el botón dice «Falta el vídeo» y un aviso explica por qué (y si abres la página como `content://`, cómo abrirla bien).
 - «Ver demo» abre el vídeo a pantalla completa con controles. La ✕ o el gesto «atrás» del móvil vuelven al menú.
 - «Ver app» (Taller, Clínicas y Obra Clara) abre la aplicación publicada en una pestaña nueva; las URL están en `APP_URL` de `generar_portafolio.py`.
+- En Círculos de confianza el botón de demo se llama «Demo en móvil» (`ETIQUETA_DEMO`); sin vídeo sale desactivado.
+- «Información» (primer botón de cada tarjeta, salvo WhatsApp) hace pasar solas las slides del carrusel: las fotos y, entre
+  ellas, slides de texto con el color de la tarjeta y letras grandes (3 s por foto, 5 s por texto). Se detiene al mover la
+  página, al pulsar cualquier otro botón o al volver a pulsar «Información». Los textos y sus iconos están en `INFO` de
+  `generar_portafolio.py`; los PDF no llevan estas slides (son estáticos).
 - Se conservan las imágenes del carrusel y el modo noche del menú de escritorio.
+- `index.html` es copia de `portafolio-movil.html` (la usa GitHub Pages): tras cambiar la página, vuelve a copiarla.
