@@ -194,16 +194,20 @@ CSS_VER_APP = (
 
 
 def acciones_movil(tid):
-    """Botones de una tarjeta movil: «Ver demo» y, si hay app publicada, «Ver app»."""
-    boton = f'<button class="access" type="button" data-app="{tid}" disabled>▶ Ver demo</button>'
-    url = APP_URL.get(tid)
-    if not url:
-        return f'        {boton}\n'
-    return (f'        <div class="acciones">\n'
-            f'          {boton}\n'
-            f'          <a class="access-app" href="{url}" target="_blank" rel="noopener">'
-            f'{ICONO_APP} Ver app</a>\n'
-            f'        </div>\n')
+    """Botones de una tarjeta movil, en este orden: «Información» (si hay texto), «Ver demo»
+    (o la etiqueta propia de la tarjeta) y, si hay app publicada, «Ver app»."""
+    botones = []
+    if tid in INFO:
+        botones.append(f'<button class="access-info" type="button" data-info="{tid}" aria-pressed="false">'
+                       f'{ICONO_PRESENTACION} Información</button>')
+    botones.append(f'<button class="access" type="button" data-app="{tid}" disabled>'
+                   f'{ICONO_PELI} {ETIQUETA_DEMO.get(tid, "Ver demo")}</button>')
+    if tid in APP_URL:
+        botones.append(f'<a class="access-app" href="{APP_URL[tid]}" target="_blank" rel="noopener">'
+                       f'{ICONO_APP} Ver app</a>')
+    if len(botones) == 1:
+        return f'        {botones[0]}\n'
+    return '        <div class="acciones">\n' + ''.join(f'          {b}\n' for b in botones) + '        </div>\n'
 
 
 def anadir_ver_app(texto):
@@ -244,9 +248,191 @@ JS_CAMBIOS = [
 ]
 
 
+# Etiqueta propia del boton de demo (por defecto «Ver demo»; sin video, «Demo próximamente»).
+ETIQUETA_DEMO = {'circulos': 'Demo en móvil'}
+
+ICONO_PRESENTACION = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
+                      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+                      '<path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/>'
+                      '<path d="m7 21 5-5 5 5"/></svg>')
+
+# Iconos (24x24, trazo) de las slides de texto.
+ICONOS_INFO = {
+    'clientes': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>'
+                '<path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+    'micro': '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>'
+             '<path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/>',
+    'calendario': '<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    'ladron': '<path d="M3 10h18M6.5 10 8 4.5h8L17.5 10"/><circle cx="9" cy="14" r="2"/>'
+              '<circle cx="15" cy="14" r="2"/><path d="M11 14h2M6.5 17.5c1.2 2.4 3 3.5 5.5 3.5s4.3-1.1 5.5-3.5"/>',
+}
+
+# Slides de texto de cada tarjeta (texto, icono opcional): van entre las fotos del carrusel.
+INFO = {
+    'taller': [
+        ('El cliente solicita sus citas, consulta precios, revisa el estado', 'clientes'),
+        ('Los mecánicos modifican el parte en modo «voz»', 'micro'),
+        ('Identificación visual de piezas', None),
+        ('QR Inteligente', 'ladron'),
+    ],
+    'circulos': [
+        ('Los voluntarios se ofrecen para tareas según su disponibilidad', None),
+        ('La aplicación puede asignar automáticamente', None),
+        ('Si uno no puede, va al siguiente de la lista', None),
+        ('Tareas por categorías para score de asignación', None),
+    ],
+    'asesorias': [
+        ('Repositorio documental', None),
+        ('Identificación visual de tickets', None),
+        ('Las consultas por IA extienden la funcionalidad del aplicativo (texto o voz)', None),
+    ],
+    'clinicas': [
+        ('El cliente solicita sus citas, consulta precios, revisa el estado', 'calendario'),
+        ('Lista de espera (para un médico en concreto, o si sale fecha anterior a la solicitada)', None),
+        ('Informe médico y procedimientos en modo voz / texto', None),
+        ('Confidencialidad de datos', None),
+        ('Responsabilidad facultativa con opción a firma delegada', None),
+    ],
+    'obra': [
+        ('Control de presupuesto', None),
+        ('Trabajos extra', None),
+        ('Materiales extra', None),
+        ('Asistente de Fotografías antes/después', None),
+        ('El encargado y el dueño están al tanto preciso de la evolución', None),
+    ],
+}
+
+CSS_INFO = (
+    '.access-info{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;'
+    'padding:10px 22px;border-radius:12px;border:2px solid transparent;background:var(--tint);color:var(--ink);'
+    'font:inherit;font-weight:700}\n'
+    '.access-info svg{width:18px;height:18px;flex:none}\n'
+    '.access-info:hover{filter:brightness(.96)}\n'
+    '.access-info[aria-pressed="true"]{background:var(--c);color:#fff}\n'
+    '[data-theme="dark"] .access-info[aria-pressed="true"]{color:#12151b}\n'
+    '/* Slides de texto del carrusel: fondo del color de la tarjeta, letras grandes */\n'
+    '.slide-texto{display:flex;flex-direction:column;justify-content:center;gap:clamp(8px,3cqw,18px);'
+    'padding:clamp(18px,5cqw,36px) clamp(58px,15cqw,92px);background:var(--c);color:#fff;overflow:hidden}\n'
+    '[data-theme="dark"] .slide-texto{color:#12151b}\n'
+    '.slide-texto svg{width:clamp(34px,10cqw,56px);height:clamp(34px,10cqw,56px);flex:none}\n'
+    '.slide-texto p{margin:0;font-size:1.35rem;font-weight:800;line-height:1.2;letter-spacing:-.01em;'
+    'overflow-wrap:anywhere;hyphens:auto}\n'
+    '@supports (font-size:1cqw){.slide-texto p{font-size:clamp(1.2rem,6.8cqw,2.2rem)}}\n'
+)
+
+AUTO_JS = r"""// ---- Información: las slides pasan solas hasta mover la página o pulsar otro botón ----
+const PAUSA_FOTO = 3000, PAUSA_TEXTO = 5000;
+let auto = null;
+function pararAuto(){
+  if(!auto) return;
+  clearTimeout(auto.t);
+  auto.btn.setAttribute("aria-pressed","false");
+  auto = null;
+}
+function iniciarAuto(btn, car){
+  const ctl = car._ctl;
+  if(!ctl) return;
+  pararAuto();
+  const n = ctl.slides.length;
+  auto = { btn, t:0, desde:Date.now() };
+  btn.setAttribute("aria-pressed","true");
+  const paso = k=>{
+    ctl.go(k);
+    auto.t = setTimeout(()=>paso((k+1)%n), ctl.slides[k].classList.contains("slide-texto") ? PAUSA_TEXTO : PAUSA_FOTO);
+  };
+  paso(Math.max(0, ctl.slides.findIndex(s=>s.classList.contains("slide-texto"))));
+}
+document.querySelectorAll("[data-info]").forEach(btn=>{
+  const car = btn.closest(".cell").querySelector(".carousel");
+  btn.addEventListener("click", ()=>{ if(auto && auto.btn === btn) pararAuto(); else iniciarAuto(btn, car); });
+});
+// Pulsar cualquier otro botón, mover la página o salir de la pestaña detiene el pase.
+document.addEventListener("click", e=>{
+  const b = e.target.closest("button, a");
+  if(auto && b && b !== auto.btn) pararAuto();
+}, true);
+["scroll","wheel","touchmove"].forEach(ev=>window.addEventListener(ev, ()=>{
+  if(auto && Date.now() - auto.desde > 600) pararAuto();
+}, {passive:true}));
+document.addEventListener("visibilitychange", ()=>{ if(document.hidden) pararAuto(); });
+"""
+
+JS_CAMBIOS += [
+    # «Demo en móvil» (etiqueta propia) en la configuracion y en los estados del boton.
+    ('  circulos:  { file:"circulos.mp4",  proximamente:true },\n',
+     '  circulos:  { file:"circulos.mp4",  proximamente:true, etiqueta:"Demo en móvil" },\n'),
+    ('btn.innerHTML = ICONO_PELI + " Ver demo · " + mins(r.dur);',
+     'btn.innerHTML = ICONO_PELI + " " + (cfg.etiqueta || "Ver demo") + " · " + mins(r.dur);'),
+    ('btn.disabled = true; btn.textContent = "Demo próximamente";',
+     'btn.disabled = true; btn.textContent = cfg.etiqueta || "Demo próximamente";'),
+    # Carrusel: cada uno expone su control (go + slides) para el pase automatico.
+    ('const track=c.querySelector(".track"), n=c.querySelectorAll(".slide").length, label=c.dataset.label;',
+     'const track=c.querySelector(".track"), slides=[...c.querySelectorAll(".slide")], n=slides.length, '
+     'label=c.dataset.label;'),
+    ('  c.append(prev,next,dots); go(0);\n});\n</script>',
+     '  c.append(prev,next,dots); go(0);\n  c._ctl = { go, slides };\n});\n' + AUTO_JS + '</script>'),
+]
+
+
+def intercalar(fotos, textos):
+    """Fotos y slides de texto: la primera foto, la mitad de los textos, la segunda foto y el resto."""
+    if not textos:
+        return fotos
+    if len(fotos) < 2:
+        return fotos + textos
+    k = (len(textos) + 1) // 2
+    return [fotos[0]] + textos[:k] + [fotos[1]] + textos[k:] + fotos[2:]
+
+
+def slide_texto(contenido, icono):
+    svg = ''
+    if icono:
+        svg = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+               f'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{ICONOS_INFO[icono]}</svg>')
+    return f'          <div class="slide slide-texto">{svg}<p>{htmlmod.escape(contenido)}</p></div>'
+
+
+def anadir_info(texto):
+    """Mete las slides de texto entre las fotos de cada carrusel y deja los botones de la
+    tarjeta (Informacion, Ver demo, Ver app) como los define acciones_movil (idempotente)."""
+    for tid, items in INFO.items():
+        pista = re.compile(rf'(<article class="cell {tid}">.*?<div class="track">\n)(.*?)(\n        </div>\n      </div>)', re.S)
+        m = pista.search(texto)
+        if not m:
+            sys.exit(f'No encuentro el carrusel de {tid} en el HTML movil')
+        lineas = m.group(2).split('\n')
+        fotos = [l for l in lineas if 'slide-texto' not in l]
+        textos = [slide_texto(t, i) for t, i in items]
+        nuevo = '\n'.join(intercalar(fotos, textos))
+        texto = texto[:m.start(2)] + nuevo + texto[m.end(2):]
+        botones = re.compile(
+            rf'(<article class="cell {tid}">.*?<p class="user">[^\n]*</p>\n)'
+            r'(?:        <div class="acciones">\n.*?        </div>\n|        <button class="access"[^\n]*</button>\n)',
+            re.S)
+        m = botones.search(texto)
+        if not m:
+            sys.exit(f'No encuentro los botones de {tid} en el HTML movil')
+        texto = texto[:m.start()] + m.group(1) + acciones_movil(tid) + texto[m.end():]
+    return texto
+
+
+def anadir_css_info(texto):
+    if '.access-info{' not in texto:
+        texto = sustituir(texto, '.access-app:hover{background:var(--tint)}\n',
+                          '.access-app:hover{background:var(--tint)}\n' + CSS_INFO, 'estilo de «Información» (movil)')
+    if 'container-type' not in texto:
+        texto = sustituir(texto, '.carousel{position:relative;aspect-ratio:4/3;overflow:hidden;background:var(--tint)}',
+                          '.carousel{position:relative;aspect-ratio:4/3;overflow:hidden;background:var(--tint);'
+                          'container-type:inline-size}', 'carrusel (movil)')
+    texto = texto.replace('6.2cqw,2.2rem', '6.8cqw,2.2rem')   # letras algo mas grandes (HTML ya generado)
+    return texto.replace('.dot[aria-current="true"]{background:var(--c)}',
+                         '.dot[aria-current="true"]{background:#fff}')
+
+
 def retocar_movil(texto):
     """Ajustes de la pagina movil (idempotente): sin linea de estado del video, «Ver demo» con
     icono de pelicula y minutos, URL de cada app y textos de «Usuario»."""
+    texto = anadir_css_info(anadir_info(texto))
     # Sin linea de estado (marcado y CSS).
     texto = re.sub(r'        <p class="estado"[^\n]*</p>\n', '', texto)
     texto = re.sub(r'^(?:\.estado|\.punto|\[data-theme="dark"\] \.estado)[^\n]*\n', '', texto, flags=re.M)
@@ -583,7 +769,7 @@ def pdf_portada(c, R, B, tarjetas, hay_video, incrustado=False):
         else:
             c.setFillColor(MUTED)
             c.setFont(R, 12)
-            c.drawString(M + 26, base + 15, 'Demo próximamente')
+            c.drawString(M + 26, base + 15, ETIQUETA_DEMO.get(t['id'], 'Demo próximamente'))
         c.setFillColor(MUTED)
         c.setFont(R, 20)
         c.drawRightString(W - M - 18, base + alto / 2 - 7, '›')
@@ -650,7 +836,7 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
     if video_ok:
         c.setFillColor(color)
         c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
-        etiqueta = 'Ver demo' + (f' · {minutos} min' if minutos else '')
+        etiqueta = ETIQUETA_DEMO.get(t['id'], 'Ver demo') + (f' · {minutos} min' if minutos else '')
         c.setFont(B, 16)
         ancho = pdfmetrics.stringWidth(etiqueta, B, 16)
         x0 = bx + (bw - (ancho + 30)) / 2
@@ -666,7 +852,8 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
         c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
         c.setFillColor(MUTED)
         c.setFont(B, 16)
-        c.drawCentredString(bx + bw / 2, by + bh / 2 - 5.5, 'Demo próximamente')
+        c.drawCentredString(bx + bw / 2, by + bh / 2 - 5.5,
+                            ETIQUETA_DEMO.get(t['id'], 'Demo próximamente'))
     if t['id'] in APP_URL:
         pdf_boton_app(c, B, t['id'], color, by, bh)
     c.setFillColor(MUTED)
