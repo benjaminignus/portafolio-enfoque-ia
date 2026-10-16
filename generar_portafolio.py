@@ -20,6 +20,7 @@ import html as htmlmod
 import io
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -66,8 +67,16 @@ VIDEO_ORIGEN = {
 # Aplicacion publicada de cada tarjeta: boton «Ver app» junto a «Ver demo» (sin entrada = sin boton).
 APP_URL = {
     'taller': 'https://app-taller-beta.vercel.app',
-    'clinicas': 'https://app-clinicas-enfoque-ia.vercel.app',
+    'clinicas': 'https://app-clinicas-enfoque-ia.vercel.app/entrar',
     'obra': 'https://appobraclara.vercel.app/#/resumen',
+}
+
+# Texto de «Usuario» de cada tarjeta. Manda sobre el de los HTML de entrada.
+USUARIO = {
+    'taller': 'Recepción, Jefe de Taller, Mecánico, Cliente (Chatbot en web)',
+    'asesorias': 'Asesores fiscales, Gestores, cualquier oficina y sus clientes, agentes, proveedores, acreedores',
+    'clinicas': 'Recepción, Dentistas, Higienistas, Médicos, Sicólogos, Dueños',
+    'obra': 'Jefes de obra, Aparejadores, Encargados, Dueños y Clientes',
 }
 
 # Tarjetas nuevas (las 4 originales se leen del HTML).
@@ -75,8 +84,7 @@ NUEVAS = [
     {
         'id': 'obra',
         'titulo': 'Obra Clara',
-        'usuario': 'empresas de reformas y construcción: jefes de obra y encargados que '
-                   'controlan el desarrollo de cada obra y sus trabajos extra.',
+        'usuario': USUARIO['obra'],
         'fotos': ['obra-1.jpg', 'obra-2.jpg'],
         'alts': ['Jefe de obra revisando los planos en una tablet dentro de una vivienda en construcción',
                  'Operario colocando azulejos en la cocina de una vivienda en reforma'],
@@ -175,12 +183,11 @@ ICONO_APP = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
              '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>')
 CSS_VER_APP = (
     '.acciones{margin-top:auto;display:flex;flex-wrap:wrap;gap:10px}\n'
-    '.estado + .acciones{margin-top:0}\n'
     '.acciones .access{margin-top:0;align-self:auto}\n'
     '.access-app{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;'
     'padding:10px 22px;border-radius:12px;border:2px solid var(--c);background:transparent;color:var(--ink);'
     'font:inherit;font-weight:700;text-decoration:none}\n'
-    '.access-app svg{width:18px;height:18px;flex:none}\n'
+    '.access svg,.access-app svg{width:18px;height:18px;flex:none}\n'
     '.access-app:hover{background:var(--tint)}\n'
     '@media (max-width:820px){.acciones{flex-direction:column}.acciones .access,.access-app{align-self:stretch}}\n'
 )
@@ -211,6 +218,56 @@ def anadir_ver_app(texto):
     return texto
 
 
+ICONO_PELI = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
+              'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+              '<rect x="2.5" y="3" width="19" height="18" rx="2.5"/>'
+              '<path d="M7 3v18M17 3v18M2.5 8h4.5M2.5 12h4.5M2.5 16h4.5M17 8h4.5M17 12h4.5M17 16h4.5"/></svg>')
+
+# Cambios del script de la pagina movil: sin linea de estado; «Ver demo» lleva los minutos.
+JS_CAMBIOS = [
+    ('const fmt = seg => Math.floor(seg/60) + " min " + String(Math.round(seg%60)).padStart(2,"0") + " s";\n',
+     "const ICONO_PELI = '" + ICONO_PELI + "';\n"
+     'const mins = seg => Math.max(1, Math.round(seg/60)) + " min";\n'),
+    ('  const estado = cell.querySelector(".estado"), txt = estado.querySelector(".txt"), '
+     'aviso = cell.querySelector(".aviso");\n',
+     '  const aviso = cell.querySelector(".aviso");\n'),
+    ('      estado.dataset.estado = "lista";\n'
+     '      txt.textContent = "Vídeo listo · " + fmt(r.dur);\n'
+     '      btn.disabled = false; btn.textContent = "▶ Ver demo";\n',
+     '      btn.disabled = false; btn.innerHTML = ICONO_PELI + " Ver demo · " + mins(r.dur);\n'),
+    ('      estado.dataset.estado = "proximamente";\n'
+     '      txt.textContent = "Sin vídeo todavía";\n',
+     ''),
+    ('      estado.dataset.estado = "falta";\n'
+     '      txt.textContent = "Vídeo no encontrado";\n',
+     ''),
+]
+
+
+def retocar_movil(texto):
+    """Ajustes de la pagina movil (idempotente): sin linea de estado del video, «Ver demo» con
+    icono de pelicula y minutos, URL de cada app y textos de «Usuario»."""
+    # Sin linea de estado (marcado y CSS).
+    texto = re.sub(r'        <p class="estado"[^\n]*</p>\n', '', texto)
+    texto = re.sub(r'^(?:\.estado|\.punto|\[data-theme="dark"\] \.estado)[^\n]*\n', '', texto, flags=re.M)
+    texto = texto.replace('/* Estado del vídeo de cada demo y aviso */', '/* Aviso de vídeo ausente */')
+    if '.access svg,' not in texto:
+        texto = texto.replace('.access-app svg{', '.access svg,.access-app svg{')
+    for viejo, nuevo in JS_CAMBIOS:
+        texto = texto.replace(viejo, nuevo)
+    # «Ver demo» con icono de pelicula.
+    texto = texto.replace('>▶ Ver demo</button>', f'>{ICONO_PELI} Ver demo</button>')
+    # URL de cada app y textos de «Usuario».
+    for tid, url in APP_URL.items():
+        texto = re.sub(rf'(<article class="cell {tid}">.*?<a class="access-app" href=")[^"]*(")',
+                       lambda m, u=url: m.group(1) + u + m.group(2), texto, count=1, flags=re.S)
+    for tid, usuario in USUARIO.items():
+        texto = re.sub(rf'(<article class="cell {tid}">.*?<p class="user"><strong>Usuario:</strong> )(.*?)(</p>)',
+                       lambda m, u=usuario: m.group(1) + htmlmod.escape(u) + m.group(3),
+                       texto, count=1, flags=re.S)
+    return texto
+
+
 def articulo_movil(t):
     """Tarjeta de la pagina movil: igual que la de escritorio, pero con estado del
     video y boton «Ver demo» (se activa sola si el .mp4 esta junto a la pagina)."""
@@ -228,9 +285,6 @@ def articulo_movil(t):
         f'      </div>\n'
         f'      <div class="cell-body">\n'
         f'        <p class="user"><strong>Usuario:</strong> {htmlmod.escape(t["usuario"])}</p>\n'
-        f'        <p class="estado" data-estado="comprobando" aria-live="polite">'
-        f'<span class="punto" aria-hidden="true"></span>'
-        f'<span class="txt">Comprobando vídeo…</span></p>\n'
         f'{acciones_movil(t["id"])}'
         f'        <p class="aviso" role="status" hidden></p>\n'
         f'      </div>\n'
@@ -277,7 +331,7 @@ def actualizar_movil(texto, nuevas):
         texto = sustituir(texto, '  let i=0;\n  const prev=',
                           '  if(n<2) return;   // una sola foto: sin flechas ni puntos\n'
                           '  let i=0;\n  const prev=', 'carrusel (movil)')
-    return anadir_ver_app(texto)
+    return retocar_movil(anadir_ver_app(texto))
 
 
 def escribir_movil_y_web(movil: Path, web_dir: Path, nuevas):
@@ -451,6 +505,38 @@ def pdf_boton_app(c, B, tid, color, by, bh):
     c.linkURL(APP_URL[tid], (ax, by, ax + aw, by + bh), relative=0, thickness=0)
 
 
+def pelicula(c, x, y, ancho, color):
+    """Icono de pelicula (fotograma con perforaciones), como el de la pagina movil."""
+    alto = ancho * 0.95
+    s = ancho * 0.26
+    c.saveState()
+    c.setStrokeColor(color)
+    c.setLineWidth(1.8)
+    c.setLineCap(1)
+    c.roundRect(x, y, ancho, alto, 2.5, stroke=1, fill=0)
+    p = c.beginPath()
+    for xx in (x + s, x + ancho - s):
+        p.moveTo(xx, y)
+        p.lineTo(xx, y + alto)
+    for k in (0.25, 0.5, 0.75):
+        p.moveTo(x, y + alto * k)
+        p.lineTo(x + s, y + alto * k)
+        p.moveTo(x + ancho - s, y + alto * k)
+        p.lineTo(x + ancho, y + alto * k)
+    c.drawPath(p, stroke=1, fill=0)
+    c.restoreState()
+
+
+def minutos_video(ruta):
+    """Minutos (redondeados, como la pagina movil) de un video; None si no se pueden medir."""
+    try:
+        r = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+                            '-of', 'csv=p=0', str(ruta)], capture_output=True, text=True, timeout=60)
+        return max(1, int(float(r.stdout.strip()) / 60 + 0.5))
+    except Exception:
+        return None
+
+
 def parrafo(c, texto, fuente, tam, ancho, x, y, interlineado, color):
     c.setFillColor(color)
     c.setFont(fuente, tam)
@@ -515,7 +601,7 @@ def pdf_portada(c, R, B, tarjetas, hay_video, incrustado=False):
     c.showPage()
 
 
-def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False):
+def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
     color, tinte = (HexColor(x) for x in COLORES[t['id']])
     c.bookmarkPage(t['id'])
     # Cabecera: tinte con borde inferior del color de la tarjeta (como en la web).
@@ -564,33 +650,27 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False):
     if video_ok:
         c.setFillColor(color)
         c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
-        etiqueta = 'Ver demo: toca el clip' if incrustado else 'Ver demo en vídeo'
+        etiqueta = 'Ver demo' + (f' · {minutos} min' if minutos else '')
         c.setFont(B, 16)
         ancho = pdfmetrics.stringWidth(etiqueta, B, 16)
         x0 = bx + (bw - (ancho + 30)) / 2
-        triangulo(c, x0, by + bh / 2 - 8, 16, white)
+        pelicula(c, x0, by + bh / 2 - 8.5, 18, white)
         c.setFillColor(white)
         c.drawString(x0 + 30, by + bh / 2 - 5.5, etiqueta)
-        if incrustado:
-            # El video va dentro del PDF: sin enlace a archivo (apuntaria a un archivo
+        if not incrustado:
+            # Con el video dentro del PDF no hay enlace a archivo (apuntaria a un archivo
             # que no existe junto al PDF y abriria el navegador con un error).
-            nota = (f'Vídeo incrustado ({VIDEO[t["id"]]}): toca el clip. '
-                    f'Si no responde, tu visor de PDF no admite adjuntos.')
-        else:
             c.linkURL(VIDEO[t['id']], (bx, by, bx + bw, by + bh), relative=0, thickness=0)
-            nota = f'Vídeo: {VIDEO[t["id"]]} (en la misma carpeta que este PDF)'
     else:
         c.setFillColor(HexColor('#eceef2'))
         c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
         c.setFillColor(MUTED)
         c.setFont(B, 16)
         c.drawCentredString(bx + bw / 2, by + bh / 2 - 5.5, 'Demo próximamente')
-        nota = f'Se activará al dejar {VIDEO[t["id"]]} junto a este PDF y regenerarlo'
     if t['id'] in APP_URL:
         pdf_boton_app(c, B, t['id'], color, by, bh)
     c.setFillColor(MUTED)
     c.setFont(R, 10)
-    c.drawString(M, 48, nota)
     c.drawRightString(W - M, 48, f'{n} / {total}')
     c.showPage()
 
@@ -602,13 +682,17 @@ def escribir_pdf(salida: Path, tarjetas, carpeta_videos: Path, incrustado=False)
     def hay_video(tid):
         return (carpeta_videos / VIDEO[tid]).exists()
 
+    def minutos(tid):
+        return minutos_video(carpeta_videos / VIDEO[tid]) if hay_video(tid) else None
+
     c = canvas.Canvas(str(salida), pagesize=A4)
     c.setTitle('Portafolio · Enfoque IA')
     c.setAuthor('Enfoque IA')
     c.setSubject('Aplicaciones de IA por sector: fichas y demos en vídeo')
     pdf_portada(c, R, B, tarjetas, hay_video, incrustado)
     for i, t in enumerate(tarjetas, start=2):
-        pdf_tarjeta(c, R, B, t, i, len(tarjetas) + 1, hay_video(t['id']), incrustado)
+        pdf_tarjeta(c, R, B, t, i, len(tarjetas) + 1, hay_video(t['id']), incrustado,
+                    minutos(t['id']))
     c.save()
     if incrustado:
         incrustar_videos(salida, tarjetas, carpeta_videos)
@@ -686,6 +770,8 @@ def main():
     originales = leer_tarjetas_originales(
         RE_ARTICULO.sub(lambda m: '\n' if m.group(1) in ('obra', 'whatsapp') else m.group(0), texto))
     todas = originales + nuevas
+    for t in todas:
+        t['usuario'] = USUARIO.get(t['id'], t['usuario'])
 
     # Videos junto al PDF.
     carpeta = a.pdf_salida.parent
