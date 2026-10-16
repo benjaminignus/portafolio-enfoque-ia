@@ -63,6 +63,13 @@ VIDEO_ORIGEN = {
     'obra-clara.mp4': r'D:\claude\portafolio\App-Obra-Clara\demo\video\ObraClara_demo_subtitulado.mp4',
 }
 
+# Aplicacion publicada de cada tarjeta: boton «Ver app» junto a «Ver demo» (sin entrada = sin boton).
+APP_URL = {
+    'taller': 'https://app-taller-beta.vercel.app',
+    'clinicas': 'https://app-clinicas-enfoque-ia.vercel.app',
+    'obra': 'https://appobraclara.vercel.app/#/resumen',
+}
+
 # Tarjetas nuevas (las 4 originales se leen del HTML).
 NUEVAS = [
     {
@@ -163,6 +170,47 @@ def articulo_html(t):
     )
 
 
+ICONO_APP = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" '
+             'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+             '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>')
+CSS_VER_APP = (
+    '.acciones{margin-top:auto;display:flex;flex-wrap:wrap;gap:10px}\n'
+    '.estado + .acciones{margin-top:0}\n'
+    '.acciones .access{margin-top:0;align-self:auto}\n'
+    '.access-app{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;'
+    'padding:10px 22px;border-radius:12px;border:2px solid var(--c);background:transparent;color:var(--ink);'
+    'font:inherit;font-weight:700;text-decoration:none}\n'
+    '.access-app svg{width:18px;height:18px;flex:none}\n'
+    '.access-app:hover{background:var(--tint)}\n'
+    '@media (max-width:820px){.acciones{flex-direction:column}.acciones .access,.access-app{align-self:stretch}}\n'
+)
+
+
+def acciones_movil(tid):
+    """Botones de una tarjeta movil: «Ver demo» y, si hay app publicada, «Ver app»."""
+    boton = f'<button class="access" type="button" data-app="{tid}" disabled>▶ Ver demo</button>'
+    url = APP_URL.get(tid)
+    if not url:
+        return f'        {boton}\n'
+    return (f'        <div class="acciones">\n'
+            f'          {boton}\n'
+            f'          <a class="access-app" href="{url}" target="_blank" rel="noopener">'
+            f'{ICONO_APP} Ver app</a>\n'
+            f'        </div>\n')
+
+
+def anadir_ver_app(texto):
+    """Pone «Ver app» junto a «Ver demo» en las tarjetas con app publicada (idempotente)."""
+    for tid in APP_URL:
+        viejo = f'\n        <button class="access" type="button" data-app="{tid}" disabled>▶ Ver demo</button>\n'
+        if viejo in texto:
+            texto = texto.replace(viejo, '\n' + acciones_movil(tid), 1)
+    if '.acciones{' not in texto:
+        texto = sustituir(texto, '.access:hover{filter:brightness(1.08)}\n',
+                          '.access:hover{filter:brightness(1.08)}\n' + CSS_VER_APP, 'estilo del boton (movil)')
+    return texto
+
+
 def articulo_movil(t):
     """Tarjeta de la pagina movil: igual que la de escritorio, pero con estado del
     video y boton «Ver demo» (se activa sola si el .mp4 esta junto a la pagina)."""
@@ -183,7 +231,7 @@ def articulo_movil(t):
         f'        <p class="estado" data-estado="comprobando" aria-live="polite">'
         f'<span class="punto" aria-hidden="true"></span>'
         f'<span class="txt">Comprobando vídeo…</span></p>\n'
-        f'        <button class="access" type="button" data-app="{t["id"]}" disabled>▶ Ver demo</button>\n'
+        f'{acciones_movil(t["id"])}'
         f'        <p class="aviso" role="status" hidden></p>\n'
         f'      </div>\n'
         f'    </article>\n'
@@ -229,7 +277,7 @@ def actualizar_movil(texto, nuevas):
         texto = sustituir(texto, '  let i=0;\n  const prev=',
                           '  if(n<2) return;   // una sola foto: sin flechas ni puntos\n'
                           '  let i=0;\n  const prev=', 'carrusel (movil)')
-    return texto
+    return anadir_ver_app(texto)
 
 
 def escribir_movil_y_web(movil: Path, web_dir: Path, nuevas):
@@ -359,6 +407,50 @@ def triangulo(c, x, y, tam, color):
     c.drawPath(p, fill=1, stroke=0)
 
 
+ANCHO_DEMO_CON_APP = 300   # ancho del boton «Ver demo» cuando la ficha tiene tambien «Ver app»
+
+
+def caja_demo(tid):
+    """(x, ancho) del boton de video de una ficha: entero, o a la izquierda si hay «Ver app»."""
+    return M, (ANCHO_DEMO_CON_APP if tid in APP_URL else W - 2 * M)
+
+
+def flecha(c, x, y, tam, color):
+    """Flecha diagonal hacia arriba a la derecha (icono de enlace externo)."""
+    c.saveState()
+    c.setStrokeColor(color)
+    c.setLineWidth(2.2)
+    c.setLineCap(1)
+    c.setLineJoin(1)
+    p = c.beginPath()
+    p.moveTo(x, y)
+    p.lineTo(x + tam, y + tam)
+    p.moveTo(x + tam * 0.3, y + tam)
+    p.lineTo(x + tam, y + tam)
+    p.lineTo(x + tam, y + tam * 0.3)
+    c.drawPath(p, stroke=1, fill=0)
+    c.restoreState()
+
+
+def pdf_boton_app(c, B, tid, color, by, bh):
+    """Boton «Ver app» (con contorno del color de la tarjeta) a la derecha del de video."""
+    ax = M + ANCHO_DEMO_CON_APP + 12
+    aw = W - M - ax
+    c.setFillColor(white)
+    c.setStrokeColor(color)
+    c.setLineWidth(2)
+    c.roundRect(ax, by, aw, bh, 12, stroke=1, fill=1)
+    c.setLineWidth(1)
+    etiqueta = 'Ver app'
+    c.setFont(B, 16)
+    ancho = pdfmetrics.stringWidth(etiqueta, B, 16)
+    x0 = ax + (aw - (ancho + 26)) / 2
+    flecha(c, x0, by + bh / 2 - 6, 12, INK)
+    c.setFillColor(INK)
+    c.drawString(x0 + 26, by + bh / 2 - 5.5, etiqueta)
+    c.linkURL(APP_URL[tid], (ax, by, ax + aw, by + bh), relative=0, thickness=0)
+
+
 def parrafo(c, texto, fuente, tam, ancho, x, y, interlineado, color):
     c.setFillColor(color)
     c.setFont(fuente, tam)
@@ -468,13 +560,14 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False):
     # Boton de video (o aviso de que aun no hay).
     bh = 52
     by = 74
+    bx, bw = caja_demo(t['id'])
     if video_ok:
         c.setFillColor(color)
-        c.roundRect(M, by, W - 2 * M, bh, 12, stroke=0, fill=1)
+        c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
         etiqueta = 'Ver demo: toca el clip' if incrustado else 'Ver demo en vídeo'
         c.setFont(B, 16)
         ancho = pdfmetrics.stringWidth(etiqueta, B, 16)
-        x0 = (W - (ancho + 30)) / 2
+        x0 = bx + (bw - (ancho + 30)) / 2
         triangulo(c, x0, by + bh / 2 - 8, 16, white)
         c.setFillColor(white)
         c.drawString(x0 + 30, by + bh / 2 - 5.5, etiqueta)
@@ -484,15 +577,17 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False):
             nota = (f'Vídeo incrustado ({VIDEO[t["id"]]}): toca el clip. '
                     f'Si no responde, tu visor de PDF no admite adjuntos.')
         else:
-            c.linkURL(VIDEO[t['id']], (M, by, W - M, by + bh), relative=0, thickness=0)
+            c.linkURL(VIDEO[t['id']], (bx, by, bx + bw, by + bh), relative=0, thickness=0)
             nota = f'Vídeo: {VIDEO[t["id"]]} (en la misma carpeta que este PDF)'
     else:
         c.setFillColor(HexColor('#eceef2'))
-        c.roundRect(M, by, W - 2 * M, bh, 12, stroke=0, fill=1)
+        c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
         c.setFillColor(MUTED)
         c.setFont(B, 16)
-        c.drawCentredString(W / 2, by + bh / 2 - 5.5, 'Demo próximamente')
+        c.drawCentredString(bx + bw / 2, by + bh / 2 - 5.5, 'Demo próximamente')
         nota = f'Se activará al dejar {VIDEO[t["id"]]} junto a este PDF y regenerarlo'
+    if t['id'] in APP_URL:
+        pdf_boton_app(c, B, t['id'], color, by, bh)
     c.setFillColor(MUTED)
     c.setFont(R, 10)
     c.drawString(M, 48, nota)
@@ -542,10 +637,11 @@ def incrustar_videos(pdf: Path, tarjetas, carpeta_videos: Path):
             sys.exit(f'No encuentro el flujo del adjunto {nombre} recien incrustado')
         flujo = int(m.group(1))
         filespec = (f'<</Type/Filespec/F({nombre})/UF({nombre})/EF<</F {flujo} 0 R>>>>')
-        # Clip a la derecha del boton (el boton va de x=M a W-M, y=74..126 en el PDF).
+        # Clip a la derecha del boton de video (y=74..126 en el PDF; ancho segun caja_demo).
         # MuPDF dibuja el icono a 20x20 pt: se centra verticalmente en el boton.
         lado = 20
-        x1 = W - M - 12 - lado
+        bx, bw = caja_demo(t['id'])
+        x1 = bx + bw - 12 - lado
         y1 = 74 + (52 - lado) / 2
         pagina = doc[i]
         punto = fitz.Point(x1, H - (y1 + lado))
