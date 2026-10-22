@@ -69,6 +69,17 @@ APP_URL = {
     'taller': 'https://app-taller-beta.vercel.app',
     'clinicas': 'https://app-clinicas-enfoque-ia.vercel.app/entrar',
     'obra': 'https://appobraclara.vercel.app/#/resumen',
+    'asesorias': 'https://app-asesorias.vercel.app/acceso',
+}
+
+# Acceso de prueba de las apps publicadas que lo necesitan: cuentas de una demo con datos ficticios y
+# contrasena publica a proposito (solo las del asesor y el cliente; la del administrador no se publica).
+# Salen en la pagina movil («Acceso de prueba») y en la ficha del PDF.
+ACCESO_DEMO = {
+    'asesorias': {
+        'lineas': [('Asesora', 'marta@rierabono.es'), ('Cliente', 'pablo@laespiga.es')],
+        'clave': 'enfoqueia',
+    },
 }
 
 # Texto de «Usuario» de cada tarjeta. Manda sobre el de los HTML de entrada.
@@ -429,10 +440,56 @@ def anadir_css_info(texto):
                          '.dot[aria-current="true"]{background:#fff}')
 
 
+CSS_ACCESO_DEMO = (
+    '.acceso-demo code{font:600 .92em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;'
+    'background:var(--tint);color:var(--ink);padding:1px 6px;border-radius:6px;white-space:nowrap}'
+)
+
+
+def completar_ver_app(texto):
+    """Pone «Ver app» junto a «Ver demo» en las tarjetas que ya tienen sus botones y aun no ese
+    (idempotente). Complementa a `anadir_ver_app`, que solo sirve con el HTML recien generado."""
+    for tid, url in APP_URL.items():
+        m = re.search(rf'<article class="cell {tid}">.*?</article>', texto, re.S)
+        if not m or 'class="access-app"' in m.group(0) or '<div class="acciones">' not in m.group(0):
+            continue
+        boton = re.search(rf'          <button class="access" type="button" data-app="{tid}" disabled>.*?</button>\n',
+                          m.group(0), re.S)
+        if not boton:
+            continue
+        enlace = (f'          <a class="access-app" href="{url}" target="_blank" rel="noopener">'
+                  f'{ICONO_APP} Ver app</a>\n')
+        texto = texto.replace(m.group(0), m.group(0).replace(boton.group(0), boton.group(0) + enlace, 1), 1)
+    return texto
+
+
+def anadir_acceso_demo(texto):
+    """«Acceso de prueba» bajo el «Usuario» de las tarjetas de ACCESO_DEMO (idempotente: lo rehace)."""
+    for tid, acceso in ACCESO_DEMO.items():
+        m = re.search(rf'<article class="cell {tid}">.*?</article>', texto, re.S)
+        if not m:
+            continue
+        cuentas = ' · '.join(f'{htmlmod.escape(rol.lower())} <code>{htmlmod.escape(correo)}</code>'
+                             for rol, correo in acceso['lineas'])
+        parrafo = (f'        <p class="user acceso-demo"><strong>Acceso de prueba:</strong> {cuentas}. '
+                   f'Contraseña de ambas: <code>{htmlmod.escape(acceso["clave"])}</code></p>\n')
+        cuerpo = re.sub(r'        <p class="user acceso-demo">.*?</p>\n', '', m.group(0), flags=re.S)
+        usuario = re.search(r'        <p class="user"><strong>Usuario:</strong>.*?</p>\n', cuerpo, re.S)
+        if not usuario:
+            continue
+        cuerpo = cuerpo.replace(usuario.group(0), usuario.group(0) + parrafo, 1)
+        texto = texto.replace(m.group(0), cuerpo, 1)
+    viejo = '.user{margin:0;color:var(--muted)}'
+    texto = re.sub(r'\n\.acceso-demo code\{[^}]*\}', '', texto)   # se rehace, para que un cambio de estilo llegue
+    if ACCESO_DEMO and viejo in texto:
+        texto = texto.replace(viejo, viejo + '\n' + CSS_ACCESO_DEMO, 1)
+    return texto
+
+
 def retocar_movil(texto):
     """Ajustes de la pagina movil (idempotente): sin linea de estado del video, «Ver demo» con
-    icono de pelicula y minutos, URL de cada app y textos de «Usuario»."""
-    texto = anadir_css_info(anadir_info(texto))
+    icono de pelicula y minutos, URL de cada app, textos de «Usuario» y acceso de prueba."""
+    texto = completar_ver_app(anadir_css_info(anadir_info(texto)))
     # Sin linea de estado (marcado y CSS).
     texto = re.sub(r'        <p class="estado"[^\n]*</p>\n', '', texto)
     texto = re.sub(r'^(?:\.estado|\.punto|\[data-theme="dark"\] \.estado)[^\n]*\n', '', texto, flags=re.M)
@@ -451,7 +508,7 @@ def retocar_movil(texto):
         texto = re.sub(rf'(<article class="cell {tid}">.*?<p class="user"><strong>Usuario:</strong> )(.*?)(</p>)',
                        lambda m, u=usuario: m.group(1) + htmlmod.escape(u) + m.group(3),
                        texto, count=1, flags=re.S)
-    return texto
+    return anadir_acceso_demo(texto)
 
 
 def articulo_movil(t):
@@ -807,7 +864,10 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
 
     # Fotos (4:3), centradas; con una sola, mas grande.
     imgs = t['imgs']
+    acceso = ACCESO_DEMO.get(t['id'])
     iw = 340 if len(imgs) > 1 else 440
+    if acceso:
+        iw = 290   # deja sitio al bloque «Acceso de prueba» sin pisar los botones
     ih = iw * 3 / 4
     y = H - alto_cab - 4 - 24
     for datos in imgs:
@@ -828,6 +888,24 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
     c.setFont(B, 13.5)
     c.drawString(M, y, 'Usuario:')
     y = parrafo(c, t['usuario'], R, 13.5, W - 2 * M - 62, M + 62, y, 19, MUTED)
+
+    # Acceso de prueba (cuentas y contrasena de la demo publicada).
+    if acceso:
+        y -= 4
+        c.setFillColor(INK)
+        c.setFont(B, 13.5)
+        c.drawString(M, y, 'Acceso de prueba:')
+        sangria = M + 8
+        filas = [(f'{rol}:', correo) for rol, correo in acceso['lineas']] + [('Contraseña:', acceso['clave'])]
+        columna = sangria + max(pdfmetrics.stringWidth(e, R, 12.5) for e, _ in filas) + 10
+        for etiqueta, valor in filas:
+            y -= 17
+            c.setFillColor(MUTED)
+            c.setFont(R, 12.5)
+            c.drawString(sangria, y, etiqueta)
+            c.setFillColor(INK)
+            c.setFont(B, 12.5)
+            c.drawString(columna, y, valor)
 
     # Boton de video (o aviso de que aun no hay).
     bh = 52

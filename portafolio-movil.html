@@ -83,6 +83,7 @@ body.open .gate{display:none}
 
 .cell-body{padding:20px 22px 24px;display:flex;flex-direction:column;gap:18px;flex:1}
 .user{margin:0;color:var(--muted)}
+.acceso-demo code{font:600 .92em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--tint);color:var(--ink);padding:1px 6px;border-radius:6px;white-space:nowrap}
 .user strong{color:var(--ink)}
 .access{align-self:flex-start;margin-top:auto;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;min-height:48px;background:var(--c);color:#fff;font:inherit;font-weight:700;padding:12px 22px;border-radius:12px}
 [data-theme="dark"] .access{color:#12151b}
@@ -209,9 +210,11 @@ body.viendo{overflow:hidden}
       </div>
       <div class="cell-body">
         <p class="user"><strong>Usuario:</strong> Asesores fiscales, Gestores, cualquier oficina y sus clientes, agentes, proveedores, acreedores</p>
+        <p class="user acceso-demo"><strong>Acceso de prueba:</strong> asesora <code>marta@rierabono.es</code> · cliente <code>pablo@laespiga.es</code>. Contraseña de ambas: <code>enfoqueia</code></p>
         <div class="acciones">
           <button class="access-info" type="button" data-info="asesorias" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg> Información</button>
           <button class="access" type="button" data-app="asesorias" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3" width="19" height="18" rx="2.5"/><path d="M7 3v18M17 3v18M2.5 8h4.5M2.5 12h4.5M2.5 16h4.5M17 8h4.5M17 12h4.5M17 16h4.5"/></svg> Ver demo</button>
+          <a class="access-app" href="https://app-asesorias.vercel.app/acceso" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg> Ver app</a>
         </div>
         <p class="aviso" role="status" hidden></p>
       </div>
