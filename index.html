@@ -192,6 +192,8 @@ body.viendo{overflow:hidden}
         <div class="acciones">
           <button class="access-info" type="button" data-info="circulos" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg> Información</button>
           <button class="access" type="button" data-app="circulos" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3" width="19" height="18" rx="2.5"/><path d="M7 3v18M17 3v18M2.5 8h4.5M2.5 12h4.5M2.5 16h4.5M17 8h4.5M17 12h4.5M17 16h4.5"/></svg> Demo en móvil</button>
+          <a class="access-app" href="https://circulosdeconfianza.vercel.app/" target="_blank" rel="noopener" data-ver-app="circulos" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg> Ver app</a>
+          <a class="access-app" href="circulos.apk" download type="application/vnd.android.package-archive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18a9 9 0 0 1 18 0Z"/><path d="M6.5 4.5 8.7 9.3M17.5 4.5l-2.2 4.8M8.5 14.5h.01M15.5 14.5h.01"/></svg> Descargar APK</a>
         </div>
         <p class="aviso" role="status" hidden></p>
       </div>
@@ -460,7 +462,7 @@ document.addEventListener("visibilitychange", ()=>{ if(document.hidden) pararAut
 // ---- Apps publicadas: «Ver app» solo está activo si la app responde ----
 // Cada app se sondea con un recurso público suyo (un icono o una hoja de estilos): si el servicio está
 // pausado, protegido con login o caído, ese recurso no carga y el botón se desactiva. Se repite cada minuto.
-const SONDA_APP = {taller:{tipo:"img", ruta:"/icon.svg"}, asesorias:{tipo:"img", ruta:"/favicon.ico"}, clinicas:{tipo:"img", ruta:"/icon.svg"}, obra:{tipo:"css", ruta:"/css/estilos.css"}};
+const SONDA_APP = {taller:{tipo:"img", ruta:"/icon.svg"}, asesorias:{tipo:"img", ruta:"/favicon.ico"}, clinicas:{tipo:"img", ruta:"/icon.svg"}, obra:{tipo:"css", ruta:"/css/estilos.css"}, circulos:{tipo:"img", ruta:"/favicon.png"}};
 function sondearApp(origen, s){
   return new Promise(res=>{
     const url = origen + s.ruta + "?_=" + Date.now();

@@ -70,7 +70,13 @@ APP_URL = {
     'clinicas': 'https://app-clinicas-enfoque-ia.vercel.app/entrar',
     'obra': 'https://appobraclara.vercel.app/#/resumen',
     'asesorias': 'https://app-asesorias.vercel.app/',
+    'circulos': 'https://circulosdeconfianza.vercel.app/',
 }
+
+# APK descargable de cada tarjeta: archivo junto a la pagina (boton «Descargar APK» con icono de Android).
+# En el PDF el enlace es la direccion publica de la web, porque el PDF no siempre va junto al archivo.
+APK = {'circulos': 'circulos.apk'}
+URL_WEB = 'https://benjaminignus.github.io/portafolio-enfoque-ia/'
 
 # Texto de «Usuario» de cada tarjeta. Manda sobre el de los HTML de entrada.
 USUARIO = {
@@ -182,6 +188,9 @@ def articulo_html(t):
 ICONO_APP = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" '
              'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
              '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>')
+ICONO_ANDROID = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
+                 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+                 '<path d="M3 18a9 9 0 0 1 18 0Z"/><path d="M6.5 4.5 8.7 9.3M17.5 4.5l-2.2 4.8M8.5 14.5h.01M15.5 14.5h.01"/></svg>')
 CSS_VER_APP = (
     '.acciones{margin-top:auto;display:flex;flex-wrap:wrap;gap:10px}\n'
     '.acciones .access{margin-top:0;align-self:auto}\n'
@@ -206,6 +215,9 @@ def acciones_movil(tid):
     if tid in APP_URL:
         botones.append(f'<a class="access-app" href="{APP_URL[tid]}" target="_blank" rel="noopener" '
                        f'data-ver-app="{tid}" aria-disabled="true">{ICONO_APP} Ver app</a>')
+    if tid in APK:
+        botones.append(f'<a class="access-app" href="{APK[tid]}" download '
+                       f'type="application/vnd.android.package-archive">{ICONO_ANDROID} Descargar APK</a>')
     if len(botones) == 1:
         return f'        {botones[0]}\n'
     return '        <div class="acciones">\n' + ''.join(f'          {b}\n' for b in botones) + '        </div>\n'
@@ -438,6 +450,7 @@ SONDA_APP = {
     'asesorias': ('img', '/favicon.ico'),
     'clinicas': ('img', '/icon.svg'),
     'obra': ('css', '/css/estilos.css'),
+    'circulos': ('img', '/favicon.png'),   # Flutter web: /icon.svg no existe y devuelve el HTML de la app
 }
 
 CSS_APP_DISPONIBLE = (
@@ -724,11 +737,47 @@ def triangulo(c, x, y, tam, color):
 
 
 ANCHO_DEMO_CON_APP = 300   # ancho del boton «Ver demo» cuando la ficha tiene tambien «Ver app»
+ANCHOS_CON_APK = (200, 140)   # anchos de «Ver demo» y «Ver app» cuando hay tambien «Descargar APK»
 
 
 def caja_demo(tid):
-    """(x, ancho) del boton de video de una ficha: entero, o a la izquierda si hay «Ver app»."""
+    """(x, ancho) del boton de video de una ficha: entero, o a la izquierda si hay «Ver app» (y «APK»)."""
+    if tid in APK:
+        return M, ANCHOS_CON_APK[0]
     return M, (ANCHO_DEMO_CON_APP if tid in APP_URL else W - 2 * M)
+
+
+def ajustar_fuente(texto, fuente, ancho_max, tam=16):
+    """Tamano de letra (hasta `tam`) con el que `texto` cabe en `ancho_max`."""
+    while tam > 10 and pdfmetrics.stringWidth(texto, fuente, tam) > ancho_max:
+        tam -= 0.5
+    return tam
+
+
+def android(c, x, y, tam, color):
+    """Icono de Android (cabeza semicircular, antenas y ojos) en un cuadrado de `tam` pt; (x, y) = esquina inferior izquierda."""
+    k = tam / 24.0
+
+    def P(a, b):   # coordenadas del icono SVG (y hacia abajo) a las del PDF
+        return x + a * k, y + (24 - b) * k
+
+    c.saveState()
+    c.setStrokeColor(color)
+    c.setFillColor(color)
+    c.setLineWidth(2.2 * k)
+    c.setLineCap(1)
+    c.setLineJoin(1)
+    cx, cy = P(12, 18)
+    p = c.beginPath()
+    p.arc(cx - 9 * k, cy - 9 * k, cx + 9 * k, cy + 9 * k, 0, 180)
+    p.close()
+    for (a, b), (d, e) in (((6.5, 4.5), (8.7, 9.3)), ((17.5, 4.5), (15.3, 9.3))):
+        p.moveTo(*P(a, b))
+        p.lineTo(*P(d, e))
+    c.drawPath(p, stroke=1, fill=0)
+    for ox in (8.5, 15.5):
+        c.circle(*P(ox, 14.5), 1.1 * k, stroke=0, fill=1)
+    c.restoreState()
 
 
 def flecha(c, x, y, tam, color):
@@ -750,8 +799,12 @@ def flecha(c, x, y, tam, color):
 
 def pdf_boton_app(c, B, tid, color, by, bh):
     """Boton «Ver app» (con contorno del color de la tarjeta) a la derecha del de video."""
-    ax = M + ANCHO_DEMO_CON_APP + 12
-    aw = W - M - ax
+    if tid in APK:
+        ax = M + ANCHOS_CON_APK[0] + 12
+        aw = ANCHOS_CON_APK[1]
+    else:
+        ax = M + ANCHO_DEMO_CON_APP + 12
+        aw = W - M - ax
     c.setFillColor(white)
     c.setStrokeColor(color)
     c.setLineWidth(2)
@@ -765,6 +818,26 @@ def pdf_boton_app(c, B, tid, color, by, bh):
     c.setFillColor(INK)
     c.drawString(x0 + 26, by + bh / 2 - 5.5, etiqueta)
     c.linkURL(APP_URL[tid], (ax, by, ax + aw, by + bh), relative=0, thickness=0)
+
+
+def pdf_boton_apk(c, B, tid, color, by, bh):
+    """Boton «Descargar APK» (contorno del color de la tarjeta, icono de Android) a la derecha de «Ver app»."""
+    ax = M + ANCHOS_CON_APK[0] + 12 + ANCHOS_CON_APK[1] + 12
+    aw = W - M - ax
+    c.setFillColor(white)
+    c.setStrokeColor(color)
+    c.setLineWidth(2)
+    c.roundRect(ax, by, aw, bh, 12, stroke=1, fill=1)
+    c.setLineWidth(1)
+    etiqueta = 'Descargar APK'
+    tam = ajustar_fuente(etiqueta, B, aw - 20 - 24, 16)
+    c.setFont(B, tam)
+    ancho = pdfmetrics.stringWidth(etiqueta, B, tam)
+    x0 = ax + (aw - (ancho + 24)) / 2
+    android(c, x0 - 1, by + bh / 2 - 9.5, 19, INK)
+    c.setFillColor(INK)
+    c.drawString(x0 + 24, by + bh / 2 - tam * 0.34, etiqueta)
+    c.linkURL(URL_WEB + APK[tid], (ax, by, ax + aw, by + bh), relative=0, thickness=0)
 
 
 def pelicula(c, x, y, ancho, color):
@@ -913,12 +986,13 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
         c.setFillColor(color)
         c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
         etiqueta = ETIQUETA_DEMO.get(t['id'], 'Ver demo') + (f' · {minutos} min' if minutos else '')
-        c.setFont(B, 16)
-        ancho = pdfmetrics.stringWidth(etiqueta, B, 16)
+        tam = ajustar_fuente(etiqueta, B, bw - 16 - 30 - (34 if incrustado else 0), 16)
+        c.setFont(B, tam)
+        ancho = pdfmetrics.stringWidth(etiqueta, B, tam)
         x0 = bx + (bw - (ancho + 30)) / 2
         pelicula(c, x0, by + bh / 2 - 8.5, 18, white)
         c.setFillColor(white)
-        c.drawString(x0 + 30, by + bh / 2 - 5.5, etiqueta)
+        c.drawString(x0 + 30, by + bh / 2 - tam * 0.34, etiqueta)
         if not incrustado:
             # Con el video dentro del PDF no hay enlace a archivo (apuntaria a un archivo
             # que no existe junto al PDF y abriria el navegador con un error).
@@ -932,6 +1006,8 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
                             ETIQUETA_DEMO.get(t['id'], 'Demo próximamente'))
     if t['id'] in APP_URL:
         pdf_boton_app(c, B, t['id'], color, by, bh)
+    if t['id'] in APK:
+        pdf_boton_apk(c, B, t['id'], color, by, bh)
     c.setFillColor(MUTED)
     c.setFont(R, 10)
     c.drawRightString(W - M, 48, f'{n} / {total}')
