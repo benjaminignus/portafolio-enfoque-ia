@@ -69,17 +69,7 @@ APP_URL = {
     'taller': 'https://app-taller-beta.vercel.app',
     'clinicas': 'https://app-clinicas-enfoque-ia.vercel.app/entrar',
     'obra': 'https://appobraclara.vercel.app/#/resumen',
-    'asesorias': 'https://app-asesorias.vercel.app/acceso',
-}
-
-# Acceso de prueba de las apps publicadas que lo necesitan: cuentas de una demo con datos ficticios y
-# contrasena publica a proposito (solo las del asesor y el cliente; la del administrador no se publica).
-# Salen en la pagina movil («Acceso de prueba») y en la ficha del PDF.
-ACCESO_DEMO = {
-    'asesorias': {
-        'lineas': [('Asesora', 'marta@rierabono.es'), ('Cliente', 'pablo@laespiga.es')],
-        'clave': 'enfoqueia',
-    },
+    'asesorias': 'https://app-asesorias.vercel.app/',
 }
 
 # Texto de «Usuario» de cada tarjeta. Manda sobre el de los HTML de entrada.
@@ -214,8 +204,8 @@ def acciones_movil(tid):
     botones.append(f'<button class="access" type="button" data-app="{tid}" disabled>'
                    f'{ICONO_PELI} {ETIQUETA_DEMO.get(tid, "Ver demo")}</button>')
     if tid in APP_URL:
-        botones.append(f'<a class="access-app" href="{APP_URL[tid]}" target="_blank" rel="noopener">'
-                       f'{ICONO_APP} Ver app</a>')
+        botones.append(f'<a class="access-app" href="{APP_URL[tid]}" target="_blank" rel="noopener" '
+                       f'data-ver-app="{tid}" aria-disabled="true">{ICONO_APP} <span class="txt">Ver app</span></a>')
     if len(botones) == 1:
         return f'        {botones[0]}\n'
     return '        <div class="acciones">\n' + ''.join(f'          {b}\n' for b in botones) + '        </div>\n'
@@ -407,7 +397,7 @@ def anadir_info(texto):
     """Mete las slides de texto entre las fotos de cada carrusel y deja los botones de la
     tarjeta (Informacion, Ver demo, Ver app) como los define acciones_movil (idempotente)."""
     for tid, items in INFO.items():
-        pista = re.compile(rf'(<article class="cell {tid}">.*?<div class="track">\n)(.*?)(\n        </div>\n      </div>)', re.S)
+        pista = re.compile(rf'(<article class="cell {tid}">(?:(?!</article>).)*?<div class="track">\n)(.*?)(\n        </div>\n      </div>)', re.S)
         m = pista.search(texto)
         if not m:
             sys.exit(f'No encuentro el carrusel de {tid} en el HTML movil')
@@ -417,7 +407,7 @@ def anadir_info(texto):
         nuevo = '\n'.join(intercalar(fotos, textos))
         texto = texto[:m.start(2)] + nuevo + texto[m.end(2):]
         botones = re.compile(
-            rf'(<article class="cell {tid}">.*?<p class="user">[^\n]*</p>\n)'
+            rf'(<article class="cell {tid}">(?:(?!</article>).)*?<p class="user">[^\n]*</p>\n)'
             r'(?:        <div class="acciones">\n.*?        </div>\n|        <button class="access"[^\n]*</button>\n)',
             re.S)
         m = botones.search(texto)
@@ -440,56 +430,85 @@ def anadir_css_info(texto):
                          '.dot[aria-current="true"]{background:#fff}')
 
 
-CSS_ACCESO_DEMO = (
-    '.acceso-demo code{font:600 .92em ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;'
-    'background:var(--tint);color:var(--ink);padding:1px 6px;border-radius:6px;white-space:nowrap}'
+# Recurso publico de cada app con el que la pagina comprueba si responde (la pagina no puede leer el
+# estado HTTP de otro dominio, pero si saber si un icono o una hoja de estilos carga o no): un servicio
+# pausado, con login de Vercel o caido devuelve otra cosa y el recurso falla.
+SONDA_APP = {
+    'taller': ('img', '/icon.svg'),
+    'asesorias': ('img', '/favicon.ico'),
+    'clinicas': ('img', '/icon.svg'),
+    'obra': ('css', '/css/estilos.css'),
+}
+
+CSS_APP_DISPONIBLE = (
+    '.access-app[aria-disabled="true"],.access-app[aria-disabled="true"]:hover{background:var(--line);'
+    'border-color:var(--line);color:var(--muted);cursor:not-allowed}\n'
 )
 
+APPS_JS_INICIO = '// ---- Apps publicadas: «Ver app» solo está activo si la app responde ----\n'
+APPS_JS_FIN = '// ---- fin de apps publicadas ----\n'
+APPS_JS = APPS_JS_INICIO + r"""// Cada app se sondea con un recurso público suyo (un icono o una hoja de estilos): si el servicio está
+// pausado, protegido con login o caído, ese recurso no carga y el botón se desactiva. Se repite cada minuto.
+const SONDA_APP = __SONDA__;
+function sondearApp(origen, s){
+  return new Promise(res=>{
+    const url = origen + s.ruta + "?_=" + Date.now();
+    let el = null, hecho = false;
+    const fin = ok=>{
+      if(hecho) return; hecho = true; clearTimeout(t);
+      if(el){ el.onload = el.onerror = null; el.remove(); }
+      res(ok);
+    };
+    const t = setTimeout(()=>fin(false), 8000);
+    if(s.tipo === "css"){
+      el = document.createElement("link"); el.rel = "stylesheet"; el.media = "not all";   // se descarga, no se aplica
+      el.onload = ()=>fin(true); el.onerror = ()=>fin(false); el.href = url; document.head.appendChild(el);
+    }else{
+      el = new Image(); el.referrerPolicy = "no-referrer";
+      el.onload = ()=>fin(true); el.onerror = ()=>fin(false); el.src = url;
+    }
+  });
+}
+const enlacesApp = [...document.querySelectorAll("[data-ver-app]")].map(a=>({ a, s:SONDA_APP[a.dataset.verApp], origen:new URL(a.href).origin }));
+function pintarApp(a, ok){
+  a.setAttribute("aria-disabled", ok ? "false" : "true");
+  a.tabIndex = ok ? 0 : -1;
+  a.querySelector(".txt").textContent = ok ? "Ver app" : "App no disponible";
+}
+enlacesApp.forEach(x=> x.a.addEventListener("click", e=>{ if(x.a.getAttribute("aria-disabled") === "true") e.preventDefault(); }));
+const comprobarApps = ()=> enlacesApp.forEach(x=>{ if(x.s) sondearApp(x.origen, x.s).then(ok=>pintarApp(x.a, ok)); else pintarApp(x.a, true); });
+comprobarApps();
+setInterval(()=>{ if(!document.hidden) comprobarApps(); }, 60000);
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) comprobarApps(); });
+""" + APPS_JS_FIN
 
-def completar_ver_app(texto):
-    """Pone «Ver app» junto a «Ver demo» en las tarjetas que ya tienen sus botones y aun no ese
-    (idempotente). Complementa a `anadir_ver_app`, que solo sirve con el HTML recien generado."""
-    for tid, url in APP_URL.items():
-        m = re.search(rf'<article class="cell {tid}">.*?</article>', texto, re.S)
-        if not m or 'class="access-app"' in m.group(0) or '<div class="acciones">' not in m.group(0):
-            continue
-        boton = re.search(rf'          <button class="access" type="button" data-app="{tid}" disabled>.*?</button>\n',
-                          m.group(0), re.S)
-        if not boton:
-            continue
-        enlace = (f'          <a class="access-app" href="{url}" target="_blank" rel="noopener">'
-                  f'{ICONO_APP} Ver app</a>\n')
-        texto = texto.replace(m.group(0), m.group(0).replace(boton.group(0), boton.group(0) + enlace, 1), 1)
-    return texto
+
+def quitar_acceso_demo(texto):
+    """Quita el parrafo «Acceso de prueba» y su estilo de las tarjetas (idempotente)."""
+    texto = re.sub(r'        <p class="user acceso-demo">.*?</p>\n', '', texto, flags=re.S)
+    return re.sub(r'\n\.acceso-demo code\{[^}]*\}', '', texto)
 
 
-def anadir_acceso_demo(texto):
-    """«Acceso de prueba» bajo el «Usuario» de las tarjetas de ACCESO_DEMO (idempotente: lo rehace)."""
-    for tid, acceso in ACCESO_DEMO.items():
-        m = re.search(rf'<article class="cell {tid}">.*?</article>', texto, re.S)
-        if not m:
-            continue
-        cuentas = ' · '.join(f'{htmlmod.escape(rol.lower())} <code>{htmlmod.escape(correo)}</code>'
-                             for rol, correo in acceso['lineas'])
-        parrafo = (f'        <p class="user acceso-demo"><strong>Acceso de prueba:</strong> {cuentas}. '
-                   f'Contraseña de ambas: <code>{htmlmod.escape(acceso["clave"])}</code></p>\n')
-        cuerpo = re.sub(r'        <p class="user acceso-demo">.*?</p>\n', '', m.group(0), flags=re.S)
-        usuario = re.search(r'        <p class="user"><strong>Usuario:</strong>.*?</p>\n', cuerpo, re.S)
-        if not usuario:
-            continue
-        cuerpo = cuerpo.replace(usuario.group(0), usuario.group(0) + parrafo, 1)
-        texto = texto.replace(m.group(0), cuerpo, 1)
-    viejo = '.user{margin:0;color:var(--muted)}'
-    texto = re.sub(r'\n\.acceso-demo code\{[^}]*\}', '', texto)   # se rehace, para que un cambio de estilo llegue
-    if ACCESO_DEMO and viejo in texto:
-        texto = texto.replace(viejo, viejo + '\n' + CSS_ACCESO_DEMO, 1)
-    return texto
+def anadir_disponibilidad_apps(texto):
+    """Estilo y script de «Ver app» desactivado cuando la app no responde (se rehacen en cada pasada)."""
+    texto = re.sub(r'\.access-app\[aria-disabled="true"\][^\n]*\n', '', texto)
+    texto = sustituir(texto, '.access-app:hover{background:var(--tint)}\n',
+                      '.access-app:hover{background:var(--tint)}\n' + CSS_APP_DISPONIBLE, 'estilo de «Ver app» (movil)')
+    sonda = '{' + ', '.join(f'{k}:{{tipo:"{t}", ruta:"{r}"}}' for k, (t, r) in SONDA_APP.items()) + '}'
+    bloque = APPS_JS.replace('__SONDA__', sonda)
+    if APPS_JS_INICIO in texto:
+        a = texto.index(APPS_JS_INICIO)
+        b = texto.index(APPS_JS_FIN, a) + len(APPS_JS_FIN)
+        return texto[:a] + bloque + texto[b:]
+    return sustituir(texto, 'document.addEventListener("visibilitychange", ()=>{ if(document.hidden) pararAuto(); });\n</script>',
+                     'document.addEventListener("visibilitychange", ()=>{ if(document.hidden) pararAuto(); });\n'
+                     + bloque + '</script>', 'final del script (movil)')
 
 
 def retocar_movil(texto):
     """Ajustes de la pagina movil (idempotente): sin linea de estado del video, «Ver demo» con
-    icono de pelicula y minutos, URL de cada app, textos de «Usuario» y acceso de prueba."""
-    texto = completar_ver_app(anadir_css_info(anadir_info(texto)))
+    icono de pelicula y minutos, URL de cada app, textos de «Usuario» y «Ver app» solo si la app responde."""
+    texto = anadir_css_info(anadir_info(quitar_acceso_demo(texto)))
     # Sin linea de estado (marcado y CSS).
     texto = re.sub(r'        <p class="estado"[^\n]*</p>\n', '', texto)
     texto = re.sub(r'^(?:\.estado|\.punto|\[data-theme="dark"\] \.estado)[^\n]*\n', '', texto, flags=re.M)
@@ -508,7 +527,7 @@ def retocar_movil(texto):
         texto = re.sub(rf'(<article class="cell {tid}">.*?<p class="user"><strong>Usuario:</strong> )(.*?)(</p>)',
                        lambda m, u=usuario: m.group(1) + htmlmod.escape(u) + m.group(3),
                        texto, count=1, flags=re.S)
-    return anadir_acceso_demo(texto)
+    return anadir_disponibilidad_apps(quitar_acceso_demo(texto))
 
 
 def articulo_movil(t):
@@ -864,10 +883,7 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
 
     # Fotos (4:3), centradas; con una sola, mas grande.
     imgs = t['imgs']
-    acceso = ACCESO_DEMO.get(t['id'])
     iw = 340 if len(imgs) > 1 else 440
-    if acceso:
-        iw = 290   # deja sitio al bloque «Acceso de prueba» sin pisar los botones
     ih = iw * 3 / 4
     y = H - alto_cab - 4 - 24
     for datos in imgs:
@@ -888,24 +904,6 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
     c.setFont(B, 13.5)
     c.drawString(M, y, 'Usuario:')
     y = parrafo(c, t['usuario'], R, 13.5, W - 2 * M - 62, M + 62, y, 19, MUTED)
-
-    # Acceso de prueba (cuentas y contrasena de la demo publicada).
-    if acceso:
-        y -= 4
-        c.setFillColor(INK)
-        c.setFont(B, 13.5)
-        c.drawString(M, y, 'Acceso de prueba:')
-        sangria = M + 8
-        filas = [(f'{rol}:', correo) for rol, correo in acceso['lineas']] + [('Contraseña:', acceso['clave'])]
-        columna = sangria + max(pdfmetrics.stringWidth(e, R, 12.5) for e, _ in filas) + 10
-        for etiqueta, valor in filas:
-            y -= 17
-            c.setFillColor(MUTED)
-            c.setFont(R, 12.5)
-            c.drawString(sangria, y, etiqueta)
-            c.setFillColor(INK)
-            c.setFont(B, 12.5)
-            c.drawString(columna, y, valor)
 
     # Boton de video (o aviso de que aun no hay).
     bh = 52
