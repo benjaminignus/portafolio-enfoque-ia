@@ -205,7 +205,7 @@ def acciones_movil(tid):
                    f'{ICONO_PELI} {ETIQUETA_DEMO.get(tid, "Ver demo")}</button>')
     if tid in APP_URL:
         botones.append(f'<a class="access-app" href="{APP_URL[tid]}" target="_blank" rel="noopener" '
-                       f'data-ver-app="{tid}" aria-disabled="true">{ICONO_APP} <span class="txt">Ver app</span></a>')
+                       f'data-ver-app="{tid}" aria-disabled="true">{ICONO_APP} Ver app</a>')
     if len(botones) == 1:
         return f'        {botones[0]}\n'
     return '        <div class="acciones">\n' + ''.join(f'          {b}\n' for b in botones) + '        </div>\n'
@@ -473,7 +473,7 @@ const enlacesApp = [...document.querySelectorAll("[data-ver-app]")].map(a=>({ a,
 function pintarApp(a, ok){
   a.setAttribute("aria-disabled", ok ? "false" : "true");
   a.tabIndex = ok ? 0 : -1;
-  a.querySelector(".txt").textContent = ok ? "Ver app" : "App no disponible";
+  a.title = ok ? "" : "App no disponible ahora mismo";   // el texto del botón no cambia: el gris basta
 }
 enlacesApp.forEach(x=> x.a.addEventListener("click", e=>{ if(x.a.getAttribute("aria-disabled") === "true") e.preventDefault(); }));
 const comprobarApps = ()=> enlacesApp.forEach(x=>{ if(x.s) sondearApp(x.origen, x.s).then(ok=>pintarApp(x.a, ok)); else pintarApp(x.a, true); });
