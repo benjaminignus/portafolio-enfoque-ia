@@ -70,7 +70,7 @@ body.open .gate{display:none}
 .cell-head{background:var(--tint);padding:18px 22px 16px;border-bottom:4px solid var(--c)}
 .cell-head h2{margin:0;font-size:1.45rem;letter-spacing:-.02em;color:var(--ink)}
 
-.carousel{position:relative;aspect-ratio:4/3;overflow:hidden;background:var(--tint);container-type:inline-size}
+.carousel{position:relative;flex:1 0 auto;aspect-ratio:4/3;overflow:hidden;background:var(--tint);container-type:inline-size}
 .track{display:flex;height:100%;transition:transform .45s ease}
 .slide{flex:0 0 100%;height:100%}
 .slide img{width:100%;height:100%;object-fit:cover;display:block}
@@ -81,13 +81,13 @@ body.open .gate{display:none}
 .dot{width:11px;height:11px;border-radius:50%;border:2px solid #fff;background:transparent;padding:0;box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .dot[aria-current="true"]{background:#fff}
 
-.cell-body{padding:20px 22px 24px;display:flex;flex-direction:column;gap:18px;flex:1}
+.cell-body{padding:20px 22px 24px;display:flex;flex-direction:column;gap:18px;flex:none}
 .user{margin:0;color:var(--muted)}
 .user strong{color:var(--ink)}
-.access{align-self:flex-start;margin-top:auto;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;min-height:48px;background:var(--c);color:#fff;font:inherit;font-weight:700;padding:12px 22px;border-radius:12px}
+.access{align-self:flex-start;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;min-height:48px;background:var(--c);color:#fff;font:inherit;font-weight:700;padding:12px 22px;border-radius:12px}
 [data-theme="dark"] .access{color:#12151b}
 .access:hover{filter:brightness(1.08)}
-.acciones{margin-top:auto;display:flex;flex-wrap:wrap;gap:10px}
+.acciones{display:flex;flex-wrap:wrap;gap:10px}
 .acciones .access{margin-top:0;align-self:auto}
 .access-app{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:10px 22px;border-radius:12px;border:2px solid var(--c);background:transparent;color:var(--ink);font:inherit;font-weight:700;text-decoration:none}
 .access svg,.access-app svg{width:18px;height:18px;flex:none}
@@ -191,7 +191,6 @@ body.viendo{overflow:hidden}
         <p class="user"><strong>Usuario:</strong> personas que cuidan y personas que piden apoyo, con administradores que supervisan.</p>
         <div class="acciones">
           <button class="access-info" type="button" data-info="circulos" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h20"/><path d="M21 3v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V3"/><path d="m7 21 5-5 5 5"/></svg> Información</button>
-          <button class="access" type="button" data-app="circulos" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3" width="19" height="18" rx="2.5"/><path d="M7 3v18M17 3v18M2.5 8h4.5M2.5 12h4.5M2.5 16h4.5M17 8h4.5M17 12h4.5M17 16h4.5"/></svg> Demo en móvil</button>
           <a class="access-app" href="https://circulosdeconfianza.vercel.app/" target="_blank" rel="noopener" data-ver-app="circulos" aria-disabled="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg> Ver app</a>
           <a class="access-app" href="circulos.apk" download type="application/vnd.android.package-archive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18a9 9 0 0 1 18 0Z"/><path d="M6.5 4.5 8.7 9.3M17.5 4.5l-2.2 4.8M8.5 14.5h.01M15.5 14.5h.01"/></svg> Descargar APK</a>
         </div>
@@ -303,7 +302,7 @@ const PASSWORD = "enfoqueia";               // cámbiala aquí
 // Para activar una demo nueva basta con dejar su .mp4 con ese nombre junto a la página.
 const DEMOS = {
   taller:    { file:"taller.mp4" },
-  circulos:  { file:"circulos.mp4",  proximamente:true, etiqueta:"Demo en móvil" },
+  circulos:  { file:"circulos.mp4",  proximamente:true },
   asesorias: { file:"asesorias.mp4", proximamente:true },
   clinicas:  { file:"clinicas.mp4" },
   obra:      { file:"obra-clara.mp4" },

@@ -192,7 +192,7 @@ ICONO_ANDROID = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
                  'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
                  '<path d="M3 18a9 9 0 0 1 18 0Z"/><path d="M6.5 4.5 8.7 9.3M17.5 4.5l-2.2 4.8M8.5 14.5h.01M15.5 14.5h.01"/></svg>')
 CSS_VER_APP = (
-    '.acciones{margin-top:auto;display:flex;flex-wrap:wrap;gap:10px}\n'
+    '.acciones{display:flex;flex-wrap:wrap;gap:10px}\n'
     '.acciones .access{margin-top:0;align-self:auto}\n'
     '.access-app{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;'
     'padding:10px 22px;border-radius:12px;border:2px solid var(--c);background:transparent;color:var(--ink);'
@@ -205,13 +205,14 @@ CSS_VER_APP = (
 
 def acciones_movil(tid):
     """Botones de una tarjeta movil, en este orden: «Información» (si hay texto), «Ver demo»
-    (o la etiqueta propia de la tarjeta) y, si hay app publicada, «Ver app»."""
+    (salvo en SIN_DEMO), «Ver app» (si hay app publicada) y «Descargar APK» (si hay APK)."""
     botones = []
     if tid in INFO:
         botones.append(f'<button class="access-info" type="button" data-info="{tid}" aria-pressed="false">'
                        f'{ICONO_PRESENTACION} Información</button>')
-    botones.append(f'<button class="access" type="button" data-app="{tid}" disabled>'
-                   f'{ICONO_PELI} {ETIQUETA_DEMO.get(tid, "Ver demo")}</button>')
+    if tid not in SIN_DEMO:
+        botones.append(f'<button class="access" type="button" data-app="{tid}" disabled>'
+                       f'{ICONO_PELI} Ver demo</button>')
     if tid in APP_URL:
         botones.append(f'<a class="access-app" href="{APP_URL[tid]}" target="_blank" rel="noopener" '
                        f'data-ver-app="{tid}" aria-disabled="true">{ICONO_APP} Ver app</a>')
@@ -261,8 +262,10 @@ JS_CAMBIOS = [
 ]
 
 
-# Etiqueta propia del boton de demo (por defecto «Ver demo»; sin video, «Demo próximamente»).
-ETIQUETA_DEMO = {'circulos': 'Demo en móvil'}
+# Tarjetas sin boton de demo en video (la pagina movil y el PDF solo llevan «Información», «Ver app» y APK).
+SIN_DEMO = {'circulos'}
+# Texto de la portada del PDF para las tarjetas sin demo en video (por defecto, «Demo próximamente»).
+ETIQUETA_PORTADA = {'circulos': 'App web y APK'}
 
 ICONO_PRESENTACION = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" '
                       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
@@ -372,8 +375,7 @@ document.addEventListener("visibilitychange", ()=>{ if(document.hidden) pararAut
 
 JS_CAMBIOS += [
     # «Demo en móvil» (etiqueta propia) en la configuracion y en los estados del boton.
-    ('  circulos:  { file:"circulos.mp4",  proximamente:true },\n',
-     '  circulos:  { file:"circulos.mp4",  proximamente:true, etiqueta:"Demo en móvil" },\n'),
+    (', etiqueta:"Demo en móvil" }', ' }'),   # Circulos ya no tiene boton de demo
     ('btn.innerHTML = ICONO_PELI + " Ver demo · " + mins(r.dur);',
      'btn.innerHTML = ICONO_PELI + " " + (cfg.etiqueta || "Ver demo") + " · " + mins(r.dur);'),
     ('btn.disabled = true; btn.textContent = "Demo próximamente";',
@@ -518,10 +520,26 @@ def anadir_disponibilidad_apps(texto):
                      + bloque + '</script>', 'final del script (movil)')
 
 
+def quitar_huecos(texto):
+    """Fichas de la pagina movil sin huecos (idempotente): cuando dos tarjetas de una fila miden lo mismo
+    pero una tiene menos contenido, la holgura la absorbe la foto del carrusel y no un hueco entre el
+    texto y los botones; los botones siguen al texto con el margen normal."""
+    cambios = [
+        ('.carousel{position:relative;aspect-ratio:4/3;', '.carousel{position:relative;flex:1 0 auto;aspect-ratio:4/3;'),
+        ('.cell-body{padding:20px 22px 24px;display:flex;flex-direction:column;gap:18px;flex:1}',
+         '.cell-body{padding:20px 22px 24px;display:flex;flex-direction:column;gap:18px;flex:none}'),
+        ('.access{align-self:flex-start;margin-top:auto;', '.access{align-self:flex-start;'),
+        ('.acciones{margin-top:auto;display:flex;', '.acciones{display:flex;'),
+    ]
+    for viejo, nuevo in cambios:
+        texto = texto.replace(viejo, nuevo)
+    return texto
+
+
 def retocar_movil(texto):
     """Ajustes de la pagina movil (idempotente): sin linea de estado del video, «Ver demo» con
     icono de pelicula y minutos, URL de cada app, textos de «Usuario» y «Ver app» solo si la app responde."""
-    texto = anadir_css_info(anadir_info(quitar_acceso_demo(texto)))
+    texto = quitar_huecos(anadir_css_info(anadir_info(quitar_acceso_demo(texto))))
     # Sin linea de estado (marcado y CSS).
     texto = re.sub(r'        <p class="estado"[^\n]*</p>\n', '', texto)
     texto = re.sub(r'^(?:\.estado|\.punto|\[data-theme="dark"\] \.estado)[^\n]*\n', '', texto, flags=re.M)
@@ -740,11 +758,26 @@ ANCHO_DEMO_CON_APP = 300   # ancho del boton «Ver demo» cuando la ficha tiene 
 ANCHOS_CON_APK = (200, 140)   # anchos de «Ver demo» y «Ver app» cuando hay tambien «Descargar APK»
 
 
+def cajas_ficha(tid):
+    """{'demo'|'app'|'apk': (x, ancho)} de los botones de una ficha, repartidos en una fila de ancho W - 2M."""
+    nombres = [n for n, hay in (('demo', tid not in SIN_DEMO), ('app', tid in APP_URL), ('apk', tid in APK)) if hay]
+    total = W - 2 * M
+    if nombres == ['demo', 'app']:
+        anchos = [ANCHO_DEMO_CON_APP, total - ANCHO_DEMO_CON_APP - 12]
+    elif nombres == ['demo', 'app', 'apk']:
+        anchos = [ANCHOS_CON_APK[0], ANCHOS_CON_APK[1], total - sum(ANCHOS_CON_APK) - 24]
+    else:   # un boton, o dos sin demo (app y APK): a partes iguales
+        anchos = [(total - 12 * (len(nombres) - 1)) / len(nombres)] * len(nombres)
+    cajas, x = {}, M
+    for nombre, ancho in zip(nombres, anchos):
+        cajas[nombre] = (x, ancho)
+        x += ancho + 12
+    return cajas
+
+
 def caja_demo(tid):
-    """(x, ancho) del boton de video de una ficha: entero, o a la izquierda si hay «Ver app» (y «APK»)."""
-    if tid in APK:
-        return M, ANCHOS_CON_APK[0]
-    return M, (ANCHO_DEMO_CON_APP if tid in APP_URL else W - 2 * M)
+    """(x, ancho) del boton de video de una ficha con demo."""
+    return cajas_ficha(tid)['demo']
 
 
 def ajustar_fuente(texto, fuente, ancho_max, tam=16):
@@ -799,12 +832,7 @@ def flecha(c, x, y, tam, color):
 
 def pdf_boton_app(c, B, tid, color, by, bh):
     """Boton «Ver app» (con contorno del color de la tarjeta) a la derecha del de video."""
-    if tid in APK:
-        ax = M + ANCHOS_CON_APK[0] + 12
-        aw = ANCHOS_CON_APK[1]
-    else:
-        ax = M + ANCHO_DEMO_CON_APP + 12
-        aw = W - M - ax
+    ax, aw = cajas_ficha(tid)['app']
     c.setFillColor(white)
     c.setStrokeColor(color)
     c.setLineWidth(2)
@@ -822,8 +850,7 @@ def pdf_boton_app(c, B, tid, color, by, bh):
 
 def pdf_boton_apk(c, B, tid, color, by, bh):
     """Boton «Descargar APK» (contorno del color de la tarjeta, icono de Android) a la derecha de «Ver app»."""
-    ax = M + ANCHOS_CON_APK[0] + 12 + ANCHOS_CON_APK[1] + 12
-    aw = W - M - ax
+    ax, aw = cajas_ficha(tid)['apk']
     c.setFillColor(white)
     c.setStrokeColor(color)
     c.setLineWidth(2)
@@ -918,7 +945,7 @@ def pdf_portada(c, R, B, tarjetas, hay_video, incrustado=False):
         else:
             c.setFillColor(MUTED)
             c.setFont(R, 12)
-            c.drawString(M + 26, base + 15, ETIQUETA_DEMO.get(t['id'], 'Demo próximamente'))
+            c.drawString(M + 26, base + 15, ETIQUETA_PORTADA.get(t['id'], 'Demo próximamente'))
         c.setFillColor(MUTED)
         c.setFont(R, 20)
         c.drawRightString(W - M - 18, base + alto / 2 - 7, '›')
@@ -956,9 +983,12 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
 
     # Fotos (4:3), centradas; con una sola, mas grande.
     imgs = t['imgs']
-    iw = 340 if len(imgs) > 1 else 440
-    ih = iw * 3 / 4
     y = H - alto_cab - 4 - 24
+    # Las fotos absorben la holgura: la ultima linea de «Usuario» queda siempre a 29 pt del boton, sin huecos.
+    lineas = len(simpleSplit(t['usuario'], R, 13.5, W - 2 * M - 62))
+    y_tras_fotos = 165 + (lineas - 1) * 19
+    iw = min(((y - y_tras_fotos) / len(imgs) - 14) * 4 / 3, 440)
+    ih = iw * 3 / 4
     for datos in imgs:
         x = (W - iw) / 2
         c.saveState()
@@ -981,29 +1011,30 @@ def pdf_tarjeta(c, R, B, t, n, total, video_ok, incrustado=False, minutos=None):
     # Boton de video (o aviso de que aun no hay).
     bh = 52
     by = 74
-    bx, bw = caja_demo(t['id'])
-    if video_ok:
-        c.setFillColor(color)
-        c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
-        etiqueta = ETIQUETA_DEMO.get(t['id'], 'Ver demo') + (f' · {minutos} min' if minutos else '')
-        tam = ajustar_fuente(etiqueta, B, bw - 16 - 30 - (34 if incrustado else 0), 16)
-        c.setFont(B, tam)
-        ancho = pdfmetrics.stringWidth(etiqueta, B, tam)
-        x0 = bx + (bw - (ancho + 30)) / 2
-        pelicula(c, x0, by + bh / 2 - 8.5, 18, white)
-        c.setFillColor(white)
-        c.drawString(x0 + 30, by + bh / 2 - tam * 0.34, etiqueta)
-        if not incrustado:
-            # Con el video dentro del PDF no hay enlace a archivo (apuntaria a un archivo
-            # que no existe junto al PDF y abriria el navegador con un error).
-            c.linkURL(VIDEO[t['id']], (bx, by, bx + bw, by + bh), relative=0, thickness=0)
-    else:
-        c.setFillColor(HexColor('#eceef2'))
-        c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
-        c.setFillColor(MUTED)
-        c.setFont(B, 16)
-        c.drawCentredString(bx + bw / 2, by + bh / 2 - 5.5,
-                            ETIQUETA_DEMO.get(t['id'], 'Demo próximamente'))
+    if t['id'] not in SIN_DEMO:
+        bx, bw = caja_demo(t['id'])
+        if video_ok:
+            c.setFillColor(color)
+            c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
+            etiqueta = 'Ver demo' + (f' · {minutos} min' if minutos else '')
+            tam = ajustar_fuente(etiqueta, B, bw - 16 - 30 - (34 if incrustado else 0), 16)
+            c.setFont(B, tam)
+            ancho = pdfmetrics.stringWidth(etiqueta, B, tam)
+            x0 = bx + (bw - (ancho + 30)) / 2
+            pelicula(c, x0, by + bh / 2 - 8.5, 18, white)
+            c.setFillColor(white)
+            c.drawString(x0 + 30, by + bh / 2 - tam * 0.34, etiqueta)
+            if not incrustado:
+                # Con el video dentro del PDF no hay enlace a archivo (apuntaria a un archivo
+                # que no existe junto al PDF y abriria el navegador con un error).
+                c.linkURL(VIDEO[t['id']], (bx, by, bx + bw, by + bh), relative=0, thickness=0)
+        else:
+            c.setFillColor(HexColor('#eceef2'))
+            c.roundRect(bx, by, bw, bh, 12, stroke=0, fill=1)
+            c.setFillColor(MUTED)
+            c.setFont(B, 16)
+            c.drawCentredString(bx + bw / 2, by + bh / 2 - 5.5,
+                                'Demo próximamente')
     if t['id'] in APP_URL:
         pdf_boton_app(c, B, t['id'], color, by, bh)
     if t['id'] in APK:
